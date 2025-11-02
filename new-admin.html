@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlertMoris Admin</title>
+    <style>
+        /* Same styles as before */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .admin-container { max-width: 600px; margin: 0 auto; background: white; border-radius: 15px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 10px; }
+        .subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
+        .form-group { margin-bottom: 25px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #2c3e50; }
+        textarea { width: 100%; padding: 15px; border: 2px solid #ecf0f1; border-radius: 8px; font-size: 16px; resize: vertical; min-height: 120px; }
+        .toggle-group { display: flex; align-items: center; justify-content: space-between; background: #f8f9fa; padding: 15px; border-radius: 8px; }
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #27ae60; }
+        input:checked + .slider:before { transform: translateX(26px); }
+        .btn { background: #3498db; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; }
+        .status { margin-top: 20px; padding: 15px; border-radius: 8px; text-align: center; font-weight: 600; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <h1>🚨 AlertMoris Admin</h1>
+        <p class="subtitle">Manage emergency alerts for the mobile app</p>
+
+        <form id="alertForm">
+            <div class="form-group">
+                <label for="alertMessage">Alert Message:</label>
+                <textarea id="alertMessage" placeholder="Enter emergency alert message..." maxlength="200"></textarea>
+                <small style="color: #7f8c8d; display: block; text-align: right; margin-top: 5px;">
+                    <span id="charCount">0</span>/200 characters
+                </small>
+            </div>
+
+            <div class="form-group">
+                <div class="toggle-group">
+                    <span class="toggle-label">Enable Alert Banner:</span>
+                    <label class="switch">
+                        <input type="checkbox" id="alertEnabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="saveBtn">
+                Save Alert Settings
+            </button>
+        </form>
+
+        <div id="statusMessage" class="status" style="display: none;"></div>
+    </div>
+
+    <script>
+        // GitHub configuration
+        const GITHUB_USERNAME = 'your-github-username';
+        const GITHUB_REPO = 'alertmoris-api';
+        const GITHUB_TOKEN = 'your-github-token'; // Create a personal access token
+        const API_URL = `https://${GITHUB_USERNAME}.github.io/${GITHUB_REPO}/alert-data.json`;
+
+        // DOM Elements
+        const alertForm = document.getElementById('alertForm');
+        const alertMessage = document.getElementById('alertMessage');
+        const alertEnabled = document.getElementById('alertEnabled');
+        const charCount = document.getElementById('charCount');
+        const saveBtn = document.getElementById('saveBtn');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // Character counter
+        alertMessage.addEventListener('input', function() {
+            charCount.textContent = this.value.length;
+        });
+
+        // Load current settings
+        async function loadCurrentSettings() {
+            try {
+                const response = await fetch(API_URL + '?t=' + Date.now());
+                const data = await response.json();
+                
+                if (data.success) {
+                    alertMessage.value = data.alert.message;
+                    alertEnabled.checked = data.alert.is_active;
+                    charCount.textContent = data.alert.message.length;
+                }
+            } catch (error) {
+                console.error('Error loading settings:', error);
+                showStatus('Error loading current settings', 'error');
+            }
+        }
+
+        // Save settings to GitHub
+        alertForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            try {
+                const alertData = {
+                    success: true,
+                    alert: {
+                        message: alertMessage.value.trim(),
+                        is_active: alertEnabled.checked
+                    }
+                };
+
+                // Update GitHub file via GitHub API
+                const updateResponse = await updateGitHubFile(alertData);
+                
+                if (updateResponse) {
+                    showStatus('Alert settings saved successfully!', 'success');
+                } else {
+                    showStatus('Error saving settings to GitHub', 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Alert Settings';
+            }
+        });
+
+        // Update GitHub file
+        async function updateGitHubFile(data) {
+            const content = JSON.stringify(data, null, 2);
+            const contentEncoded = btoa(unescape(encodeURIComponent(content)));
+            
+            // First, get the current SHA of the file
+            const getResponse = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/alert-data.json`, {
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            const fileInfo = await getResponse.json();
+            const sha = fileInfo.sha;
+
+            // Update the file
+            const updateResponse = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/alert-data.json`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: 'Update alert settings',
+                    content: contentEncoded,
+                    sha: sha
+                })
+            });
+
+            return updateResponse.ok;
+        }
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status ${type}`;
+            statusMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        // Load settings when page loads
+        loadCurrentSettings();
+    </script>
+</body>
+</html>
