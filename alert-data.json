@@ -1,7 +1,7 @@
 {
-    "success": true,
-    "alert": {
-        "message": "No active alerts",
-        "is_active": false
-    }
+  "success": true,
+  "alert": {
+    "message": "No active alerts",
+    "is_active": true
+  }
 }
