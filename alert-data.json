@@ -2,6 +2,6 @@
   "success": true,
   "alert": {
     "message": "No active alerts",
-    "is_active": true
+    "is_active": false
   }
 }
