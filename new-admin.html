@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AlertMoris Admin</title>
     <style>
-        /* Same styles as before */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .admin-container { max-width: 600px; margin: 0 auto; background: white; border-radius: 15px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
@@ -21,10 +20,17 @@
         .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #27ae60; }
         input:checked + .slider:before { transform: translateX(26px); }
-        .btn { background: #3498db; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; }
+        .btn { background: #3498db; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 10px; }
+        .btn-secondary { background: #95a5a6; }
+        .btn-success { background: #27ae60; }
         .status { margin-top: 20px; padding: 15px; border-radius: 8px; text-align: center; font-weight: 600; }
-        .status.success { background: #d4edda; color: #155724; }
-        .status.error { background: #f8d7da; color: #721c24; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .instructions { background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #ffc107; }
+        .instructions h3 { color: #856404; margin-bottom: 10px; }
+        .instructions code { background: #f8f9fa; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+        .json-output { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; margin-top: 15px; font-family: monospace; white-space: pre-wrap; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -51,116 +57,96 @@
                 </div>
             </div>
 
-            <button type="submit" class="btn" id="saveBtn">
-                Save Alert Settings
+            <button type="button" class="btn" id="previewBtn">
+                Preview & Generate JSON
+            </button>
+            
+            <button type="button" class="btn btn-success" id="saveLocalBtn">
+                Save to Local Storage
             </button>
         </form>
 
         <div id="statusMessage" class="status" style="display: none;"></div>
+
+        <div class="instructions">
+            <h3>📋 How to Update the Live Alert System</h3>
+            <p><strong>Step 1:</strong> Copy the JSON below</p>
+            <p><strong>Step 2:</strong> Go to your GitHub repository</p>
+            <p><strong>Step 3:</strong> Edit the <code>alert-data.json</code> file</p>
+            <p><strong>Step 4:</strong> Replace the content with the JSON below</p>
+            <p><strong>Step 5:</strong> Commit the changes</p>
+            <p>Your app will automatically update within 30 seconds!</p>
+        </div>
+
+        <div class="json-output" id="jsonOutput">
+            {/* JSON will appear here */}
+        </div>
     </div>
 
     <script>
-        // GitHub configuration
-        const GITHUB_USERNAME = 'your-github-username';
-        const GITHUB_REPO = 'alertmoris-api';
-        const GITHUB_TOKEN = 'your-github-token'; // Create a personal access token
-        const API_URL = `https://${GITHUB_USERNAME}.github.io/${GITHUB_REPO}/alert-data.json`;
-
         // DOM Elements
         const alertForm = document.getElementById('alertForm');
         const alertMessage = document.getElementById('alertMessage');
         const alertEnabled = document.getElementById('alertEnabled');
         const charCount = document.getElementById('charCount');
-        const saveBtn = document.getElementById('saveBtn');
+        const previewBtn = document.getElementById('previewBtn');
+        const saveLocalBtn = document.getElementById('saveLocalBtn');
         const statusMessage = document.getElementById('statusMessage');
+        const jsonOutput = document.getElementById('jsonOutput');
 
         // Character counter
         alertMessage.addEventListener('input', function() {
             charCount.textContent = this.value.length;
+            generateJSON();
         });
 
-        // Load current settings
-        async function loadCurrentSettings() {
-            try {
-                const response = await fetch(API_URL + '?t=' + Date.now());
-                const data = await response.json();
-                
-                if (data.success) {
-                    alertMessage.value = data.alert.message;
-                    alertEnabled.checked = data.alert.is_active;
-                    charCount.textContent = data.alert.message.length;
-                }
-            } catch (error) {
-                console.error('Error loading settings:', error);
-                showStatus('Error loading current settings', 'error');
+        // Toggle change
+        alertEnabled.addEventListener('change', generateJSON);
+
+        // Load current settings from localStorage
+        function loadCurrentSettings() {
+            const saved = localStorage.getItem('alertmoris_settings');
+            if (saved) {
+                const data = JSON.parse(saved);
+                alertMessage.value = data.alert.message;
+                alertEnabled.checked = data.alert.is_active;
+                charCount.textContent = data.alert.message.length;
+                generateJSON();
+            } else {
+                // Default values
+                generateJSON();
             }
         }
 
-        // Save settings to GitHub
-        alertForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
-
-            try {
-                const alertData = {
-                    success: true,
-                    alert: {
-                        message: alertMessage.value.trim(),
-                        is_active: alertEnabled.checked
-                    }
-                };
-
-                // Update GitHub file via GitHub API
-                const updateResponse = await updateGitHubFile(alertData);
-                
-                if (updateResponse) {
-                    showStatus('Alert settings saved successfully!', 'success');
-                } else {
-                    showStatus('Error saving settings to GitHub', 'error');
+        // Generate JSON output
+        function generateJSON() {
+            const alertData = {
+                success: true,
+                alert: {
+                    message: alertMessage.value.trim() || 'No active alerts',
+                    is_active: alertEnabled.checked
                 }
-            } catch (error) {
-                showStatus('Error: ' + error.message, 'error');
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save Alert Settings';
-            }
+            };
+            
+            jsonOutput.textContent = JSON.stringify(alertData, null, 2);
+        }
+
+        // Save to localStorage
+        saveLocalBtn.addEventListener('click', function() {
+            const alertData = {
+                success: true,
+                alert: {
+                    message: alertMessage.value.trim() || 'No active alerts',
+                    is_active: alertEnabled.checked
+                }
+            };
+            
+            localStorage.setItem('alertmoris_settings', JSON.stringify(alertData));
+            showStatus('Settings saved to browser storage!', 'success');
         });
 
-        // Update GitHub file
-        async function updateGitHubFile(data) {
-            const content = JSON.stringify(data, null, 2);
-            const contentEncoded = btoa(unescape(encodeURIComponent(content)));
-            
-            // First, get the current SHA of the file
-            const getResponse = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/alert-data.json`, {
-                headers: {
-                    'Authorization': `token ${GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-            
-            const fileInfo = await getResponse.json();
-            const sha = fileInfo.sha;
-
-            // Update the file
-            const updateResponse = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/contents/alert-data.json`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: 'Update alert settings',
-                    content: contentEncoded,
-                    sha: sha
-                })
-            });
-
-            return updateResponse.ok;
-        }
+        // Preview button
+        previewBtn.addEventListener('click', generateJSON);
 
         function showStatus(message, type) {
             statusMessage.textContent = message;
@@ -174,6 +160,7 @@
 
         // Load settings when page loads
         loadCurrentSettings();
+        generateJSON();
     </script>
 </body>
 </html>
