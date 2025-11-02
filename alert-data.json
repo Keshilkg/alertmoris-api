@@ -1,7 +1,7 @@
 {
   "success": true,
   "alert": {
-    "message": "No active alerts",
-    "is_active": false
+    "message": "Cyclone - Loic class III",
+    "is_active": true
   }
 }
