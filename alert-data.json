@@ -1,7 +1,7 @@
 {
   "success": true,
   "alert": {
-    "message": "Cyclone Belal - Incoming Towards Mauritius",
-    "is_active": false
+    "message": "Cyclone Belal - Warning",
+    "is_active": true
   }
 }
