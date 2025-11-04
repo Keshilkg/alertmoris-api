@@ -1,7 +1,7 @@
 {
   "success": true,
   "alert": {
-    "message": "Cyclone Belal - Warning",
-    "is_active": false
+    "message": "Cyclone Warning Class II",
+    "is_active": true
   }
 }
