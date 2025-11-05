@@ -2,6 +2,6 @@
   "success": true,
   "alert": {
     "message": "Cyclone Warning Class II",
-    "is_active": true
+    "is_active": false
   }
 }
